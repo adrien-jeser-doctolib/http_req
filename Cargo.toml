@@ -27,11 +27,11 @@ git = "https://github.com/CedricCouton/rustls"
 optional = true
 
 [dependencies.webpki]
-version = "^0.21"
+git = "https://github.com/CedricCouton/webpki"
 optional = true
 
 [dependencies.webpki-roots]
-version = "^0.18"
+git = "https://github.com/CedricCouton/webpki-roots"
 optional = true
 
 [badges]
