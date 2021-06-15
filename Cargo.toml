@@ -22,7 +22,7 @@ version = "^0.2"
 optional = true
 
 [dependencies.rustls]
-git = "https://github.com/CedricCouton/rustls"
+version = "^0.17"
 optional = true
 
 [dependencies.webpki]
@@ -35,3 +35,7 @@ optional = true
 
 [badges]
 travis-ci = { repository = "jayjamesjay/http_req"}
+
+
+[patch.crates-io]
+rustls = { git = "https://github.com/CedricCouton/rustls", rev = "17a59b63539c13c2c9a05435b44490aa0b6b4739"}

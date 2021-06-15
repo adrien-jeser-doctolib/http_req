@@ -286,7 +286,7 @@ dependencies = [
 [[package]]
 name = "rustls"
 version = "0.17.0"
-source = "git+https://github.com/CedricCouton/rustls#17a59b63539c13c2c9a05435b44490aa0b6b4739"
+source = "git+https://github.com/CedricCouton/rustls?rev=17a59b63539c13c2c9a05435b44490aa0b6b4739#17a59b63539c13c2c9a05435b44490aa0b6b4739"
 dependencies = [
  "base64",
  "log",
