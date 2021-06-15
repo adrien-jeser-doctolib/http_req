@@ -22,7 +22,8 @@ version = "^0.2"
 optional = true
 
 [dependencies.rustls]
-version = "^0.19"
+version = "^0.17"
+git = "https://github.com/CedricCouton/rustls"
 optional = true
 
 [dependencies.webpki]
