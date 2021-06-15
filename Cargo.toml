@@ -22,16 +22,15 @@ version = "^0.2"
 optional = true
 
 [dependencies.rustls]
-version = "^0.16"
-git = "https://github.com/CedricCouton/rustls"
+version = "^0.19"
 optional = true
 
 [dependencies.webpki]
-git = "https://github.com/CedricCouton/webpki"
+version = "^0.21"
 optional = true
 
 [dependencies.webpki-roots]
-git = "https://github.com/CedricCouton/webpki-roots"
+version = "^0.21"
 optional = true
 
 [badges]

@@ -8,9 +8,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "base64"
-version = "0.11.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b41b7ea54a0c9d92199de89e20e58d49f02f8e699814ef3fdf266f6f748d15c7"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bitflags"
@@ -285,8 +285,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.16.0"
-source = "git+https://github.com/CedricCouton/rustls#89847efa080cdccdb28dd7af4d0429a3a87b0a70"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35edb675feee39aec9c99fa5ff985081995a06d594114ae14cbe797ad7b7a6d7"
 dependencies = [
  "base64",
  "log",
@@ -474,8 +475,9 @@ dependencies = [
 
 [[package]]
 name = "webpki"
-version = "0.21.0"
-source = "git+https://github.com/CedricCouton/webpki#9f49daad05fe2936f3ad45a3adc193eccf8dbfb1"
+version = "0.21.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring",
  "untrusted",
@@ -483,8 +485,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.19.0"
-source = "git+https://github.com/CedricCouton/webpki-roots#b26a0115d685319114b0e3f3cca5b2ac1a894d17"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aabe153544e473b775453675851ecc86863d2a81d786d741f6b76778f2a48940"
 dependencies = [
  "webpki",
 ]
