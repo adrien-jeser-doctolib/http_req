@@ -38,4 +38,4 @@ travis-ci = { repository = "jayjamesjay/http_req"}
 
 
 [patch.crates-io]
-rustls = { git = "https://github.com/CedricCouton/rustls", rev = "b311600ff16ade633c5ff6290667c17afc159229"}
+rustls = { git = "https://github.com/CedricCouton/rustls", rev = "a9fe8f895d215989963bb905dc112a707fc82299"}
