@@ -547,9 +547,7 @@ impl<'a> RequestBuilder<'a> {
         T: Write + Read,
         U: Write,
     {
-        self.send_with_session(
-            stream,
-            writer,
+        let client_session = if self.uri.scheme() == "https" {
             Some(|| {
                 let mut config = rustls::ClientConfig::new();
                 config.key_log = Arc::new(rustls::KeyLogFile::new());
@@ -561,8 +559,12 @@ impl<'a> RequestBuilder<'a> {
                     &Arc::new(config),
                     webpki::DNSNameRef::try_from_ascii_str(self.uri.host().unwrap()).unwrap(),
                 )
-            }),
-        )
+            })
+        } else {
+            None
+        };
+
+        self.send_with_session(stream, writer, client_session)
     }
 
     pub fn send_http<T, U>(&self, stream: &mut T, writer: &mut U) -> Result<Response, error::Error>
