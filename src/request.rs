@@ -242,7 +242,7 @@ pub struct RequestBuilder<'a> {
     headers: Headers,
     body: Option<&'a [u8]>,
     timeout: Option<Duration>,
-    proxy: Option<String>,
+    proxy: Option<Uri>,
 }
 
 impl<'a> RequestBuilder<'a> {
@@ -274,8 +274,13 @@ impl<'a> RequestBuilder<'a> {
             version: HttpVersion::Http11,
             body: None,
             timeout: None,
-            proxy: None,
+            proxy: "localhost:8888".parse().ok(),
         }
+    }
+
+    pub fn proxy(&mut self, proxy: Option<Uri>) -> &mut Self {
+        self.proxy = proxy;
+        self
     }
 
     ///Sets request method
@@ -458,6 +463,43 @@ impl<'a> RequestBuilder<'a> {
         self
     }
 
+    pub fn send_with_session<T, U, F>(
+        &self,
+        stream: &mut T,
+        writer: &mut U,
+        client_session: Option<F>,
+    ) -> Result<Response, error::Error>
+    where
+        T: Write + Read,
+        U: Write,
+        F: Fn() -> ClientSession,
+    {
+        if self.proxy.is_some() {
+            self.write_msg(stream, &self.parse_connect()?)?;
+
+            let head_deadline = match self.timeout {
+                Some(t) => Instant::now() + t,
+                None => Instant::now() + Duration::from_secs(360),
+            };
+            self.read_head(stream, head_deadline)?;
+            let session = match client_session {
+                Some(f) => f(),
+                None => {
+                    let config = rustls::ClientConfig::new();
+
+                    ClientSession::new(
+                        &Arc::new(config),
+                        webpki::DNSNameRef::try_from_ascii_str(self.uri.host().unwrap()).unwrap(),
+                    )
+                }
+            };
+
+            self.send_http(&mut StreamOwned::new(session, stream), writer)
+        } else {
+            self.send_http(stream, writer)
+        }
+    }
+
     ///Sends HTTP request in these steps:
     ///
     ///- Writes request message to `stream`.
@@ -505,42 +547,35 @@ impl<'a> RequestBuilder<'a> {
         T: Write + Read,
         U: Write,
     {
-        println!("## QUX {:?}", std::str::from_utf8(&self.parse_msg()));
-
-        self.write_msg(
+        self.send_with_session(
             stream,
-            &format!("CONNECT qualiflps.services-ps.ameli.fr:443 HTTP/1.1\r\nHost: qualiflps.services-ps.ameli.fr:443\r\n\r\n")
-                .as_bytes()
-                .to_vec(),
-        )?;
+            writer,
+            Some(|| {
+                let mut config = rustls::ClientConfig::new();
+                config.key_log = Arc::new(rustls::KeyLogFile::new());
+                config
+                    .dangerous()
+                    .set_certificate_verifier(Arc::new(CustomWebPKIVerifier {}));
 
+                ClientSession::new(
+                    &Arc::new(config),
+                    webpki::DNSNameRef::try_from_ascii_str(self.uri.host().unwrap()).unwrap(),
+                )
+            }),
+        )
+    }
+
+    pub fn send_http<T, U>(&self, stream: &mut T, writer: &mut U) -> Result<Response, error::Error>
+    where
+        T: Write + Read,
+        U: Write,
+    {
         let head_deadline = match self.timeout {
             Some(t) => Instant::now() + t,
             None => Instant::now() + Duration::from_secs(360),
         };
-        let [head, body_part] = copy_until(stream, &CR_LF_2, head_deadline)?;
-        println!(
-            "CONNECT HEAD={:?} BODY={:?}",
-            String::from_utf8(head),
-            String::from_utf8(body_part)
-        );
-
-        let mut config = rustls::ClientConfig::new();
-        config.key_log = Arc::new(rustls::KeyLogFile::new());
-        config
-            .dangerous()
-            .set_certificate_verifier(Arc::new(CustomWebPKIVerifier {}));
-
-        let session = ClientSession::new(
-            &Arc::new(config),
-            webpki::DNSNameRef::try_from_ascii_str(self.uri.host().unwrap()).unwrap(),
-        );
-        let mut a = StreamOwned::new(session, stream);
-        let stream = &mut a;
-
         self.write_msg(stream, &self.parse_msg())?;
         let (res, body_part) = self.read_head(stream, head_deadline)?;
-        println!("BODY={body_part:?}");
 
         if self.method == Method::HEAD {
             return Ok(res);
@@ -602,17 +637,21 @@ impl<'a> RequestBuilder<'a> {
         Ok((Response::from_head(&head)?, body_part))
     }
 
+    pub fn parse_connect(&self) -> Result<Vec<u8>, error::Error> {
+        let host_header = self.uri.host_header().ok_or(error::ParseErr::UriErr)?;
+        Ok(
+            format!("CONNECT {host_header} HTTP/1.1{CR_LF}Host: {host_header}{CR_LF}{CR_LF}")
+                .as_bytes()
+                .to_vec(),
+        )
+    }
+
     ///Parses request message for this `RequestBuilder`
     pub fn parse_msg(&self) -> Vec<u8> {
         let request_line = format!(
             "{} {} {}{}",
             self.method,
             self.uri.resource(),
-            // format_args!(
-            // "https://{}{}",
-            // self.uri.host().unwrap(),
-            // self.uri.resource()
-            // ),
             self.version,
             CR_LF
         );
@@ -938,11 +977,20 @@ impl<'a> Request<'a> {
     ///let response = Request::new(&uri).send(&mut writer).unwrap();
     ///```
     pub fn send<T: Write>(&self, writer: &mut T) -> Result<Response, error::Error> {
-        // let host = self.inner.uri.host().unwrap_or("");
-        // let port = self.inner.uri.corr_port();
+        let host = self
+            .inner
+            .proxy
+            .as_ref()
+            .and_then(|p| p.host())
+            .unwrap_or_else(|| self.inner.uri.host().unwrap_or_default());
 
-        let host = "localhost";
-        let port = 8888;
+        let port = self
+            .inner
+            .proxy
+            .as_ref()
+            .and_then(|p| p.port())
+            .unwrap_or_else(|| self.inner.uri.port().unwrap_or_default());
+
         let mut stream = match self.connect_timeout {
             Some(timeout) => connect_timeout(host, port, timeout)?,
             None => TcpStream::connect((host, port))?,
