@@ -5,6 +5,14 @@ use crate::{
     tls,
     uri::Uri,
 };
+use rustls::Certificate;
+use rustls::ClientSession;
+use rustls::RootCertStore;
+use rustls::ServerCertVerified;
+use rustls::ServerCertVerifier;
+use rustls::StreamOwned;
+use rustls::TLSError;
+use std::sync::Arc;
 use std::{
     fmt,
     io::{self, ErrorKind, Read, Write},
@@ -17,6 +25,25 @@ const CR_LF: &str = "\r\n";
 const BUF_SIZE: usize = 8 * 1024;
 const SMALL_BUF_SIZE: usize = 8 * 10;
 const TEST_FREQ: usize = 100;
+
+pub struct CustomWebPKIVerifier {}
+
+impl ServerCertVerifier for CustomWebPKIVerifier {
+    /// Will verify the certificate is valid in the following ways:
+    /// - Signed by a  trusted `RootCertStore` CA
+    /// - Not Expired
+    /// - Valid for DNS entry
+    /// - OCSP data is present
+    fn verify_server_cert(
+        &self,
+        _roots: &RootCertStore,
+        _presented_certs: &[Certificate],
+        _dns_name: webpki::DNSNameRef,
+        _ocsp_response: &[u8],
+    ) -> std::result::Result<ServerCertVerified, TLSError> {
+        Ok(ServerCertVerified::assertion())
+    }
+}
 
 ///Every iteration increases `count` by one. When `count` is equal to `stop`, `next()`
 ///returns `Some(true)` (and sets `count` to 0), otherwise returns `Some(false)`.
@@ -215,6 +242,7 @@ pub struct RequestBuilder<'a> {
     headers: Headers,
     body: Option<&'a [u8]>,
     timeout: Option<Duration>,
+    proxy: Option<String>,
 }
 
 impl<'a> RequestBuilder<'a> {
@@ -246,6 +274,7 @@ impl<'a> RequestBuilder<'a> {
             version: HttpVersion::Http11,
             body: None,
             timeout: None,
+            proxy: None,
         }
     }
 
@@ -476,13 +505,42 @@ impl<'a> RequestBuilder<'a> {
         T: Write + Read,
         U: Write,
     {
-        self.write_msg(stream, &self.parse_msg())?;
+        println!("## QUX {:?}", std::str::from_utf8(&self.parse_msg()));
+
+        self.write_msg(
+            stream,
+            &format!("CONNECT qualiflps.services-ps.ameli.fr:443 HTTP/1.1\r\nHost: qualiflps.services-ps.ameli.fr:443\r\n\r\n")
+                .as_bytes()
+                .to_vec(),
+        )?;
 
         let head_deadline = match self.timeout {
             Some(t) => Instant::now() + t,
             None => Instant::now() + Duration::from_secs(360),
         };
+        let [head, body_part] = copy_until(stream, &CR_LF_2, head_deadline)?;
+        println!(
+            "CONNECT HEAD={:?} BODY={:?}",
+            String::from_utf8(head),
+            String::from_utf8(body_part)
+        );
+
+        let mut config = rustls::ClientConfig::new();
+        config.key_log = Arc::new(rustls::KeyLogFile::new());
+        config
+            .dangerous()
+            .set_certificate_verifier(Arc::new(CustomWebPKIVerifier {}));
+
+        let session = ClientSession::new(
+            &Arc::new(config),
+            webpki::DNSNameRef::try_from_ascii_str(self.uri.host().unwrap()).unwrap(),
+        );
+        let mut a = StreamOwned::new(session, stream);
+        let stream = &mut a;
+
+        self.write_msg(stream, &self.parse_msg())?;
         let (res, body_part) = self.read_head(stream, head_deadline)?;
+        println!("BODY={body_part:?}");
 
         if self.method == Method::HEAD {
             return Ok(res);
@@ -550,6 +608,11 @@ impl<'a> RequestBuilder<'a> {
             "{} {} {}{}",
             self.method,
             self.uri.resource(),
+            // format_args!(
+            // "https://{}{}",
+            // self.uri.host().unwrap(),
+            // self.uri.resource()
+            // ),
             self.version,
             CR_LF
         );
@@ -875,8 +938,11 @@ impl<'a> Request<'a> {
     ///let response = Request::new(&uri).send(&mut writer).unwrap();
     ///```
     pub fn send<T: Write>(&self, writer: &mut T) -> Result<Response, error::Error> {
-        let host = self.inner.uri.host().unwrap_or("");
-        let port = self.inner.uri.corr_port();
+        // let host = self.inner.uri.host().unwrap_or("");
+        // let port = self.inner.uri.corr_port();
+
+        let host = "localhost";
+        let port = 8888;
         let mut stream = match self.connect_timeout {
             Some(timeout) => connect_timeout(host, port, timeout)?,
             None => TcpStream::connect((host, port))?,

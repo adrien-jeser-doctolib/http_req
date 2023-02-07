@@ -38,6 +38,7 @@ impl Response {
     ///```
     pub fn from_head(head: &[u8]) -> Result<Response, Error> {
         let mut head = str::from_utf8(head)?.splitn(2, '\n');
+        println!("HEAD {:?}", head);
 
         let status = head.next().ok_or(ParseErr::StatusErr)?.parse()?;
         let headers = head.next().ok_or(ParseErr::HeadersErr)?.parse()?;
